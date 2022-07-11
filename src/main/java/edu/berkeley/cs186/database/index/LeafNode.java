@@ -194,6 +194,8 @@ class LeafNode extends BPlusNode {
         rids = ridsLeft;
         rightSibling = Optional.of(newPageNum);
 
+        sync();
+
         return Optional.of(new Pair<>(keysRight.get(0), newPageNum));
     }
 
@@ -252,7 +254,7 @@ class LeafNode extends BPlusNode {
 
     /** Returns the right sibling of this leaf, if it has one. */
     Optional<LeafNode> getRightSibling() {
-        if (!rightSibling.isPresent()) {
+        if (!rightSibling.isPresent() || rightSibling.get() == -1) {
             return Optional.empty();
         }
 

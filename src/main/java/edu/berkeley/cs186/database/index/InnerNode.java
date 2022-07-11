@@ -115,6 +115,7 @@ class InnerNode extends BPlusNode {
 
         int d = metadata.getOrder();
         if (keys.size() <= 2 * d) {
+            sync();
             return Optional.empty();
         }
 
@@ -130,6 +131,7 @@ class InnerNode extends BPlusNode {
 
         keys = keysLeft;
         children = childrenLeft;
+        sync();
 
         return Optional.of(new Pair<>(keyMiddle, newPageNum));
     }
