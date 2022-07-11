@@ -147,7 +147,7 @@ public class BPlusTree {
 
         // TODO(proj2): implement
 
-        return Optional.empty();
+        return root.get(key).getKey(key);
     }
 
     /**
@@ -258,7 +258,24 @@ public class BPlusTree {
         // Use the provided updateRoot() helper method to change
         // the tree's root if the old root splits.
 
-        return;
+        Optional<Pair<DataBox, Long>> o = root.put(key, rid);
+        if (!o.isPresent()) {
+            return;
+        }
+
+        // split
+        Pair<DataBox, Long> p = o.get();
+        DataBox dataBox = p.getFirst();
+        long pageNumRight = p.getSecond();
+
+        List<DataBox> keys = new ArrayList<>();
+        keys.add(dataBox);
+        List<Long> children = new ArrayList<>();
+        long pageNumLeft = root.getPage().getPageNum();
+        children.add(pageNumLeft);
+        children.add(pageNumRight);
+
+        updateRoot(new InnerNode(metadata, bufferManager, keys, children, lockContext));
     }
 
     /**
@@ -308,7 +325,7 @@ public class BPlusTree {
 
         // TODO(proj2): implement
 
-        return;
+        root.remove(key);
     }
 
     // Helpers /////////////////////////////////////////////////////////////////

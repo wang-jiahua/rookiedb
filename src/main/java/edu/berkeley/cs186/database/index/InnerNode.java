@@ -82,7 +82,8 @@ class InnerNode extends BPlusNode {
     public LeafNode get(DataBox key) {
         // TODO(proj2): implement
 
-        return null;
+        int n = numLessThanEqual(key, keys);
+        return getChild(n).get(key);
     }
 
     // See BPlusNode.getLeftmostLeaf.
@@ -91,7 +92,7 @@ class InnerNode extends BPlusNode {
         assert(children.size() > 0);
         // TODO(proj2): implement
 
-        return null;
+        return getChild(0).getLeftmostLeaf();
     }
 
     // See BPlusNode.put.
@@ -99,7 +100,38 @@ class InnerNode extends BPlusNode {
     public Optional<Pair<DataBox, Long>> put(DataBox key, RecordId rid) {
         // TODO(proj2): implement
 
-        return Optional.empty();
+        int index = numLessThanEqual(key, keys);
+        Optional<Pair<DataBox, Long>> o = getChild(index).put(key, rid);
+        if (!o.isPresent()) {
+            return Optional.empty();
+        }
+
+        Pair<DataBox, Long> p = o.get();
+        DataBox dataBox = p.getFirst();
+        long pageNum = p.getSecond();
+
+        keys.add(index, dataBox);
+        children.add(index + 1, pageNum);
+
+        int d = metadata.getOrder();
+        if (keys.size() <= 2 * d) {
+            return Optional.empty();
+        }
+
+        // split
+        List<DataBox> keysLeft = keys.subList(0, d);
+        List<Long> childrenLeft = children.subList(0, d + 1);
+        DataBox keyMiddle = keys.get(d);
+        List<DataBox> keysRight = keys.subList(d + 1, 2 * d + 1);
+        List<Long> childrenRight = children.subList(d + 1, 2 * d + 2);
+
+        InnerNode innerRight = new InnerNode(metadata, bufferManager, keysRight, childrenRight, treeContext);
+        long newPageNum = innerRight.getPage().getPageNum();
+
+        keys = keysLeft;
+        children = childrenLeft;
+
+        return Optional.of(new Pair<>(keyMiddle, newPageNum));
     }
 
     // See BPlusNode.bulkLoad.
@@ -116,7 +148,7 @@ class InnerNode extends BPlusNode {
     public void remove(DataBox key) {
         // TODO(proj2): implement
 
-        return;
+        get(key).remove(key);
     }
 
     // Helpers /////////////////////////////////////////////////////////////////
