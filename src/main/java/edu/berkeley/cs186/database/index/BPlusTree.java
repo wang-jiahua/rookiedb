@@ -239,6 +239,26 @@ public class BPlusTree {
         return new BPlusTreeIterator(key);
     }
 
+    private void splitRoot(Optional<Pair<DataBox, Long>> o) {
+        if (!o.isPresent()) {
+            return;
+        }
+
+        Pair<DataBox, Long> p = o.get();
+        DataBox key = p.getFirst();
+        long pageNum = p.getSecond();
+
+        List<DataBox> keys = new ArrayList<>();
+        keys.add(key);
+
+        List<Long> children = new ArrayList<>();
+        long pageNumLeft = root.getPage().getPageNum();
+        children.add(pageNumLeft);
+        children.add(pageNum);
+
+        updateRoot(new InnerNode(metadata, bufferManager, keys, children, lockContext));
+    }
+
     /**
      * Inserts a (key, rid) pair into a B+ tree. If the key already exists in
      * the B+ tree, then the pair is not inserted and an exception is raised.
@@ -259,23 +279,7 @@ public class BPlusTree {
         // the tree's root if the old root splits.
 
         Optional<Pair<DataBox, Long>> o = root.put(key, rid);
-        if (!o.isPresent()) {
-            return;
-        }
-
-        // split
-        Pair<DataBox, Long> p = o.get();
-        DataBox dataBox = p.getFirst();
-        long pageNumRight = p.getSecond();
-
-        List<DataBox> keys = new ArrayList<>();
-        keys.add(dataBox);
-        List<Long> children = new ArrayList<>();
-        long pageNumLeft = root.getPage().getPageNum();
-        children.add(pageNumLeft);
-        children.add(pageNumRight);
-
-        updateRoot(new InnerNode(metadata, bufferManager, keys, children, lockContext));
+        splitRoot(o);
     }
 
     /**
@@ -304,7 +308,19 @@ public class BPlusTree {
         // Use the provided updateRoot() helper method to change
         // the tree's root if the old root splits.
 
-        return;
+        if (fillFactor > 1 || fillFactor <= 0) {
+            return;
+        }
+
+        if (scanAll().hasNext()) {
+            String msg = "Tree is not empty.";
+            throw new BPlusTreeException(msg);
+        }
+
+        while(data.hasNext()) {
+            Optional<Pair<DataBox, Long>> o = root.bulkLoad(data, fillFactor);
+            splitRoot(o);
+        }
     }
 
     /**

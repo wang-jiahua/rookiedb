@@ -95,31 +95,9 @@ class InnerNode extends BPlusNode {
         return getChild(0).getLeftmostLeaf();
     }
 
-    // See BPlusNode.put.
-    @Override
-    public Optional<Pair<DataBox, Long>> put(DataBox key, RecordId rid) {
-        // TODO(proj2): implement
-
-        int index = numLessThanEqual(key, keys);
-        Optional<Pair<DataBox, Long>> o = getChild(index).put(key, rid);
-        if (!o.isPresent()) {
-            return Optional.empty();
-        }
-
-        Pair<DataBox, Long> p = o.get();
-        DataBox dataBox = p.getFirst();
-        long pageNum = p.getSecond();
-
-        keys.add(index, dataBox);
-        children.add(index + 1, pageNum);
-
+    private Optional<Pair<DataBox, Long>> splitInner() {
         int d = metadata.getOrder();
-        if (keys.size() <= 2 * d) {
-            sync();
-            return Optional.empty();
-        }
 
-        // split
         List<DataBox> keysLeft = keys.subList(0, d);
         List<Long> childrenLeft = children.subList(0, d + 1);
         DataBox keyMiddle = keys.get(d);
@@ -136,13 +114,48 @@ class InnerNode extends BPlusNode {
         return Optional.of(new Pair<>(keyMiddle, newPageNum));
     }
 
+    private Optional<Pair<DataBox, Long>> insert(Optional<Pair<DataBox, Long>> o) {
+        if (!o.isPresent()) {
+            return Optional.empty();
+        }
+
+        Pair<DataBox, Long> p = o.get();
+        DataBox key = p.getFirst();
+        long pageNum = p.getSecond();
+
+        int index = numLessThanEqual(key, keys);
+        keys.add(index, key);
+        children.add(index + 1, pageNum);
+
+        int d = metadata.getOrder();
+        if (keys.size() <= 2 * d) {
+            sync();
+            return Optional.empty();
+        }
+        return splitInner();
+    }
+
+    // See BPlusNode.put.
+    @Override
+    public Optional<Pair<DataBox, Long>> put(DataBox key, RecordId rid) {
+        // TODO(proj2): implement
+
+        int index = numLessThanEqual(key, keys);
+        Optional<Pair<DataBox, Long>> o = getChild(index).put(key, rid);
+
+        return insert(o);
+    }
+
     // See BPlusNode.bulkLoad.
     @Override
     public Optional<Pair<DataBox, Long>> bulkLoad(Iterator<Pair<DataBox, RecordId>> data,
             float fillFactor) {
         // TODO(proj2): implement
 
-        return Optional.empty();
+        BPlusNode rightmostChild = getChild(children.size() - 1);
+        Optional<Pair<DataBox, Long>> o = rightmostChild.bulkLoad(data, fillFactor);
+
+        return insert(o);
     }
 
     // See BPlusNode.remove.
