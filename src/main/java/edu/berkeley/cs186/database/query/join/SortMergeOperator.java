@@ -162,7 +162,7 @@ public class SortMergeOperator extends JoinOperator {
                     rightIterator.markPrev();
                     marked = true;
                 }
-                if (rightRecord != null && compare(leftRecord, rightRecord) == 0) {
+                if (compare(leftRecord, rightRecord) == 0) {
                     Record record = leftRecord.concat(rightRecord);
                     if (rightIterator.hasNext()) {
                         rightRecord = rightIterator.next();
@@ -178,10 +178,10 @@ public class SortMergeOperator extends JoinOperator {
                 } else {
                     rightIterator.reset();
                     rightRecord = rightIterator.next();
-                    if (!leftIterator.hasNext()) {
-                        return null;
+                    leftRecord = null;
+                    if (leftIterator.hasNext()) {
+                        leftRecord = leftIterator.next();
                     }
-                    leftRecord = leftIterator.next();
                     marked = false;
                 }
             }
