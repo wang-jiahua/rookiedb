@@ -753,6 +753,10 @@ public class QueryPlan {
             map = minCostJoins(map, pass1Map);
         }
         finalOperator = minCostOperator(map);
+        addGroupBy();
+        addProject();
+        addSort();
+        addLimit();
         return finalOperator.iterator();
     }
 
