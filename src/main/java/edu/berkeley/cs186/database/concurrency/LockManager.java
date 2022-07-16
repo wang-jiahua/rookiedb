@@ -172,7 +172,7 @@ public class LockManager {
         return resourceEntries.get(name);
     }
 
-    private void checkNoLockHeld(TransactionContext transaction, ResourceName name) {
+    public void checkNoLockHeld(TransactionContext transaction, ResourceName name) {
         if (getLockType(transaction, name) == LockType.NL) {
             String msg = transaction + " doesn't hold a lock on " + name.toString();
             throw new NoLockHeldException(msg);
