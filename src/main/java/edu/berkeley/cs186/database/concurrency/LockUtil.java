@@ -42,8 +42,70 @@ public class LockUtil {
         LockType explicitLockType = lockContext.getExplicitLockType(transaction);
 
         // TODO(proj4_part2): implement
-        return;
+        // if current type can substitute requested type, we've done
+        if (LockType.substitutable(effectiveLockType, requestType)) {
+            return;
+        }
+        // current type cannot substitute requested type
+        // if current type is IX and requested type is S, promote it to SIX
+        if (explicitLockType == LockType.IX && requestType == LockType.S) {
+            requestType = LockType.SIX;
+            getIndent(parentContext, requestType);
+            lockContext.promote(transaction, requestType);
+            return;
+        }
+        // if current type is IS / IX / SIX, escalate it to S / X
+        if (explicitLockType.isIntent()) {
+            getIndent(parentContext, requestType);
+            lockContext.escalate(transaction);
+            return;
+        }
+        // if current type is NL / S / X, its children hold no lock.
+        // acquire lock on it and corresponding indent lock on ancestors.
+        getIndent(parentContext, requestType);
+        getLock(lockContext, requestType);
     }
 
     // TODO(proj4_part2) add any helper methods you want
+
+    /**
+     * get corresponding indent lock of `requestType` on `lockContext` recursively
+     * @param lockContext the given lock context
+     * @param requestType the requested lock type
+     */
+    private static void getIndent(LockContext lockContext, LockType requestType) {
+        TransactionContext transaction = TransactionContext.getTransaction();
+        if (transaction == null || lockContext == null) {
+            return;
+        }
+        LockType explicitLockType = lockContext.getExplicitLockType(transaction);
+        LockType indentLockType = LockType.parentLock(requestType);
+        if (LockType.substitutable(explicitLockType, indentLockType)) {
+            return;
+        }
+        LockContext parentContext = lockContext.parentContext();
+        if (explicitLockType == LockType.S && indentLockType == LockType.IX) {
+            indentLockType = LockType.SIX;
+        }
+        getIndent(parentContext, indentLockType);
+        getLock(lockContext, indentLockType);
+    }
+
+    /**
+     * get lock of `requestType` on `lockContext`
+     * @param lockContext the given lock context
+     * @param lockType the requested lock type
+     */
+    private static void getLock(LockContext lockContext, LockType lockType) {
+        TransactionContext transaction = TransactionContext.getTransaction();
+        if (transaction == null || lockContext == null) {
+            return;
+        }
+        LockType explicitLockType = lockContext.getExplicitLockType(transaction);
+        if (explicitLockType == LockType.NL) {
+            lockContext.acquire(transaction, lockType);
+        } else {
+            lockContext.promote(transaction, lockType);
+        }
+    }
 }
