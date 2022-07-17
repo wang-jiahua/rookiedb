@@ -466,7 +466,32 @@ public class ARIESRecoveryManager implements RecoveryManager {
         Map<Long, Pair<Transaction.Status, Long>> chkptTxnTable = new HashMap<>();
 
         // TODO(proj5): generate end checkpoint record(s) for DPT and transaction table
-
+        // iterate through the dirtyPageTable and copy the entries. If at any point,
+        // copying the current record would cause the end checkpoint record to be too large,
+        // an end checkpoint record with the copied DPT entries should be appended to the log.
+        for (Long pageNum: dirtyPageTable.keySet()) {
+            if (!EndCheckpointLogRecord.fitsInOneRecord(chkptDPT.size() + 1, 0)) {
+                LogRecord endRecord = new EndCheckpointLogRecord(chkptDPT, chkptTxnTable);
+                logManager.appendToLog(endRecord);
+                chkptDPT.clear();
+            }
+            long recLSN = dirtyPageTable.get(pageNum);
+            chkptDPT.put(pageNum, recLSN);
+        }
+        // iterate through the transaction table, and copy the status/lastLSN, outputting
+        // end checkpoint records only as needed.
+        for (Long transNum: transactionTable.keySet()) {
+            if (!EndCheckpointLogRecord.fitsInOneRecord(chkptDPT.size(), chkptTxnTable.size() + 1)) {
+                LogRecord endRecord = new EndCheckpointLogRecord(chkptDPT, chkptTxnTable);
+                logManager.appendToLog(endRecord);
+                chkptDPT.clear();
+                chkptTxnTable.clear();
+            }
+            TransactionTableEntry entry = transactionTable.get(transNum);
+            Transaction.Status status = entry.transaction.getStatus();
+            long lastLSN = entry.lastLSN;
+            chkptTxnTable.put(transNum, new Pair<>(status, lastLSN));
+        }
         // Last end checkpoint record
         LogRecord endRecord = new EndCheckpointLogRecord(chkptDPT, chkptTxnTable);
         logManager.appendToLog(endRecord);
