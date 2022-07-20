@@ -635,7 +635,7 @@ public class ARIESRecoveryManager implements RecoveryManager {
         Iterator<LogRecord> logRecords = logManager.scanFrom(minRecLSN);
         while (logRecords.hasNext()) {
             LogRecord logRecord = logRecords.next();
-            if (!logRecord.isUndoable()) {
+            if (!logRecord.isRedoable()) {
                 continue;
             }
             switch (logRecord.getType()) {
