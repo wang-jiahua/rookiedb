@@ -628,7 +628,29 @@ public class ARIESRecoveryManager implements RecoveryManager {
      */
     void restartRedo() {
         // TODO(proj5): implement
-        return;
+        if (dirtyPageTable.isEmpty()) {
+            return;
+        }
+        long minRecLSN = Collections.min(dirtyPageTable.values());
+        Iterator<LogRecord> logRecords = logManager.scanFrom(minRecLSN);
+        while (logRecords.hasNext()) {
+            LogRecord logRecord = logRecords.next();
+            if (!logRecord.isUndoable()) {
+                continue;
+            }
+            switch (logRecord.getType()) {
+                case ALLOC_PART: case UNDO_ALLOC_PART:
+                case FREE_PART: case UNDO_FREE_PART:
+                case ALLOC_PAGE: case UNDO_FREE_PAGE: {
+                    logRecord.redo(this, diskSpaceManager, bufferManager);
+                    break;
+                }
+                case UPDATE_PAGE: case UNDO_UPDATE_PAGE: case UNDO_ALLOC_PAGE: case FREE_PAGE: {
+                    redoDirtyPage(logRecord);
+                }
+                default:
+            }
+        }
     }
 
     /**
@@ -767,6 +789,30 @@ public class ARIESRecoveryManager implements RecoveryManager {
                 abort(transNum);
                 transaction.setStatus(Transaction.Status.RECOVERY_ABORTING);
             }
+        }
+    }
+
+    private void redoDirtyPage(LogRecord logRecord) {
+        if (!logRecord.getPageNum().isPresent()) {
+            return;
+        }
+        long pageNum = logRecord.getPageNum().get();
+        if (!dirtyPageTable.containsKey(pageNum)) {
+            return;
+        }
+        long LSN = logRecord.getLSN();
+        long recLSN = dirtyPageTable.get(pageNum);
+        if (LSN < recLSN) {
+            return;
+        }
+        Page page = bufferManager.fetchPage(new DummyLockContext(), pageNum);
+        try {
+            long pageLSN = page.getPageLSN();
+            if (pageLSN < LSN) {
+                logRecord.redo(this, diskSpaceManager, bufferManager);
+            }
+        } finally {
+            page.unpin();
         }
     }
 }
