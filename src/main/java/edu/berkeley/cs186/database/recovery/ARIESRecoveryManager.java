@@ -7,6 +7,7 @@ import edu.berkeley.cs186.database.io.DiskSpaceManager;
 import edu.berkeley.cs186.database.memory.BufferManager;
 import edu.berkeley.cs186.database.memory.Page;
 import edu.berkeley.cs186.database.recovery.records.*;
+import edu.berkeley.cs186.database.table.Record;
 
 import java.util.*;
 import java.util.concurrent.ConcurrentHashMap;
@@ -668,7 +669,31 @@ public class ARIESRecoveryManager implements RecoveryManager {
      */
     void restartUndo() {
         // TODO(proj5): implement
-        return;
+        PriorityQueue<Pair<Long, Long>> queue = new PriorityQueue<>(new PairFirstReverseComparator<>());
+        for (long transNum: transactionTable.keySet()) {
+            long lastLSN = transactionTable.get(transNum).lastLSN;
+            queue.add(new Pair<>(lastLSN, transNum));
+        }
+        while (!queue.isEmpty()) {
+            Pair<Long, Long> transInfo = queue.poll();
+            long lastLSN = transInfo.getFirst();
+            long transNum = transInfo.getSecond();
+            LogRecord logRecord = logManager.fetchLogRecord(lastLSN);
+            TransactionTableEntry entry = transactionTable.get(transNum);
+
+            if (logRecord.isUndoable()) {
+                LogRecord CLR = logRecord.undo(entry.lastLSN);
+                entry.lastLSN = logManager.appendToLog(CLR);
+                CLR.redo(this, diskSpaceManager, bufferManager);
+            }
+            long undoNextLSN = logRecord.getUndoNextLSN().orElse(logRecord.getPrevLSN().orElse(0L));
+            if (undoNextLSN == 0) {
+                entry.transaction.cleanup();
+                end(transNum);
+            } else {
+                queue.add(new Pair<>(undoNextLSN, transNum));
+            }
+        }
     }
 
     /**
